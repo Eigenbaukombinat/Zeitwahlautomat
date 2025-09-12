@@ -68,6 +68,39 @@ Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 WiFiClient espClient;
 PubSubClient client(espClient);
 
+// Sommerzeit-Berechnung für Deutschland
+bool isSommerzeit(int year, int month, int day, int hour) {
+  // Letzter Sonntag im März
+  int lastMarchSunday = 31 - ((5 * year / 4 + 4) % 7);
+  // Letzter Sonntag im Oktober
+  int lastOctoberSunday = 31 - ((5 * year / 4 + 1) % 7);
+
+  if (month < 3 || month > 10) return false; // Jan, Feb, Nov, Dez: keine Sommerzeit
+  if (month > 3 && month < 10) return true;  // Apr bis Sep: immer Sommerzeit
+
+  if (month == 3) {
+    // März: ab letztem Sonntag 2:00 Uhr Sommerzeit
+    if (day > lastMarchSunday) return true;
+    if (day < lastMarchSunday) return false;
+    return hour >= 2;
+  }
+  if (month == 10) {
+    // Oktober: bis letztem Sonntag 2:00 Uhr Sommerzeit
+    if (day < lastOctoberSunday) return true;
+    if (day > lastOctoberSunday) return false;
+    return hour < 3;
+  }
+  return false;
+}
+
+int timezoneOffset() {
+  if (isSommerzeit(year_, month_, day_, hour_)) {
+    return 7200; // MESZ: UTC+2
+  } else {
+    return 3600; // MEZ: UTC+1
+  }
+}
+
 void setup() {
   // initialize LCD
   lcd.init();
@@ -87,6 +120,37 @@ void setup() {
   lcd.clear();
 
   timeClient.begin();
+  
+  // Erste Zeit holen
+  timeClient.update();
+  unix_epoch = timeClient.getEpochTime();
+  minute_ = minute(unix_epoch);
+  hour_   = hour(unix_epoch);
+  day_    = day(unix_epoch);
+  month_  = month(unix_epoch);
+  year_   = year(unix_epoch);
+  
+  // Offset für Sommer-/Winterzeit setzen
+  timeClient.setTimeOffset(timezoneOffset());
+  
+  // Zeit und Sommerzeitstatus anzeigen
+  char zeitBuffer[6];
+  snprintf(zeitBuffer, sizeof(zeitBuffer), "%02d:%02d", hour_, minute_);
+  char datumBuffer[11];
+  snprintf(datumBuffer, sizeof(datumBuffer), "%02d.%02d.%04d", day_, month_, year_);
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print(zeitBuffer);
+  lcd.setCursor(6, 0);
+  lcd.print(datumBuffer);
+  lcd.setCursor(0, 1);
+  if (isSommerzeit(year_, month_, day_, hour_)) {
+    lcd.print("MESZ (Sommerzeit)");
+  } else {
+    lcd.print("MEZ (Winterzeit)");
+  }
+  delay(3000); // 3 Sekunden anzeigen
+  lcd.clear();
 }
 
 void setup_wifi() {
@@ -94,6 +158,9 @@ void setup_wifi() {
   delay(10);
   //We start by connecting to a WiFi network
   Serial.println();
+  lcd.print("Connecting to");
+  lcd.setCursor(0, 1);
+  lcd.print(ssid);
   Serial.print("Connecting to ");
   Serial.println(ssid);
 
@@ -102,10 +169,12 @@ void setup_wifi() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
-
   }
 
   Serial.println("");
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Wifi connected");
   Serial.println("WiFi connected");
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
@@ -139,8 +208,8 @@ void reconnect() {
 void loop() {
   while (!client.connected()) {
     Serial.println("kein MQTT");
+    lcd.print("kein MQTT ... reconnect");
     reconnect();
-   
   }
 
 
@@ -392,6 +461,8 @@ void loop() {
 
   year_   = year(unix_epoch);
 
+  // Offset für Sommer-/Winterzeit setzen
+  timeClient.setTimeOffset(timezoneOffset());
 
   if (last_second != minute_) {
     last_second = minute_;
@@ -438,6 +509,4 @@ void loop() {
   //  Serial.println(Date);
 
 client.loop();
-
-
 }
