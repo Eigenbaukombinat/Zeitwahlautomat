@@ -51,7 +51,7 @@ int sectest;
 unsigned long unix_epoch;
 
 
-LiquidCrystal_I2C lcd(0x27, lcdColumns, lcdRows);
+LiquidCrystal_I2C lcd(0x3F, lcdColumns, lcdRows);
 
 char keys[ROWS][COLS] = {
   {'1', '2', '3'},
