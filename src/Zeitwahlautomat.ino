@@ -1,4 +1,8 @@
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+#else
 #include <WiFi.h>
+#endif
 #include <WiFiUdp.h>
 #include <PubSubClient.h>
 #include <Wire.h>
@@ -11,7 +15,6 @@ const char *ssid     = ""; // WLAN SSID
 const char *password = ""; // WLAN Password
 const char* mqttServer = ""; // MQTT Server Address
 const int mqttPort = 1883;
-
 
 unsigned long previousMillis1 = 0;
 unsigned long interval1 = 60000;
@@ -50,7 +53,6 @@ int sectest;
 
 unsigned long unix_epoch;
 
-
 LiquidCrystal_I2C lcd(0x3F, lcdColumns, lcdRows);
 
 char keys[ROWS][COLS] = {
@@ -60,8 +62,8 @@ char keys[ROWS][COLS] = {
   {'*', '0', '#'}
 };
 
-byte rowPins[ROWS] = {32, 33, 25, 26}; //connect to the row pinouts of the keypad
-byte colPins[COLS] = {27, 14, 12}; //connect to the column pinouts of the keypad
+byte rowPins[ROWS] = {16, 00, 02, 14}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {12, 13, 03}; //connect to the column pinouts of the keypad
 
 Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
 
@@ -106,7 +108,7 @@ void setup() {
   lcd.init();
   // turn on LCD backlight
   lcd.backlight();
-  Serial.begin(9600);
+  Serial.begin(115200);
   setup_wifi();
   client.setServer(mqttServer, mqttPort);
   // client.setCallback(callback);
@@ -204,14 +206,12 @@ void reconnect() {
   }
 }
 
-
 void loop() {
   while (!client.connected()) {
     Serial.println("kein MQTT");
     lcd.print("kein MQTT ... reconnect");
     reconnect();
   }
-
 
   if ( aender == 1) {
     if (menu == 0) {
@@ -450,15 +450,10 @@ void loop() {
   timeClient.update();
   unix_epoch = timeClient.getEpochTime();
 
-
   minute_ = minute(unix_epoch);
-
   hour_   = hour(unix_epoch);
-
   day_    = day(unix_epoch);
-
   month_  = month(unix_epoch);
-
   year_   = year(unix_epoch);
 
   // Offset für Sommer-/Winterzeit setzen
@@ -469,43 +464,26 @@ void loop() {
     Serial.println("Neue Minute");
     aender = 1;
   }
-
-
   if (last_hour != hour_) {
     last_hour = hour_;
     Serial.println("Neue Stunde");
     unix_epoch = timeClient.getEpochTime();
   }
 
-
   Time[4]  = minute_ % 10 + 48;
-
   Time[3]  = minute_ / 10 + 48;
-
   Time[1]  = hour_   % 10 + 48;
-
   Time[0]  = hour_   / 10 + 48;
 
-
-
   Date[0]  = day_   / 10 + 48;
-
   Date[1]  = day_   % 10 + 48;
-
   Date[3]  = month_  / 10 + 48;
-
   Date[4]  = month_  % 10 + 48;
-
   Date[8] = (year_   / 10) % 10 + 48;
-
   Date[9] = year_   % 10 % 10 + 48;
 
-
-
   // Send time and date to serial monitor
-
   // Serial.println(Time);
-
   //  Serial.println(Date);
 
 client.loop();
